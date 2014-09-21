@@ -55,7 +55,7 @@
 
 /* Prototypes */
 void forgepacket(unsigned int, unsigned int, unsigned short, unsigned 
-                 short,char *,int,int,int,int); 
+                 short,char *,int,int,int,int,int); 
 unsigned short in_cksum(unsigned short *, int);
 unsigned int host_convert(char *);
 void usage(char *);
@@ -64,7 +64,7 @@ main(int argc, char **argv)
 {
    unsigned int source_host=0,dest_host=0;
    unsigned short source_port=0,dest_port=80;
-   int ipid=0,seq=0,ack=0,server=0,file=0;
+   int ipid=0,seq=0,win=0,ack=0,server=0,file=0;
    int count;
    char desthost[80],srchost[80],filename[80];
 
@@ -112,6 +112,8 @@ main(int argc, char **argv)
       ipid=1;
     else if (strcmp(argv[count],"-seq") == 0)
       seq=1;
+    else if (strcmp(argv[count],"-win") == 0)
+      win=1;
     else if (strcmp(argv[count],"-ack") == 0)
       ack=1;
     else if (strcmp(argv[count],"-server") == 0)
@@ -119,9 +121,9 @@ main(int argc, char **argv)
     }
 
    /* check the encoding flags */
-   if(ipid+seq+ack == 0)
+   if(ipid+seq+ack+win == 0)
     ipid=1; /* set default encode type if none given */
-   else if (ipid+seq+ack !=1)
+   else if (ipid+seq+ack+win !=1)
     {
     printf("\n\nOnly one encoding/decode flag (-ipid -seq -ack) can be used at a time.\n\n");
     exit(1);
@@ -159,6 +161,8 @@ main(int argc, char **argv)
         printf("Encoding Type   : IP ID\n");
        else if(seq == 1)
         printf("Encoding Type   : IP Sequence Number\n");
+       else if(win == 1)
+        printf("Encoding Type   : TCP Window Size\n");
        printf("\nClient Mode: Sending data.\n\n");
       }
      }
@@ -183,6 +187,8 @@ main(int argc, char **argv)
       printf("Decoding Type Is: IP packet ID\n");
      else if(seq == 1)
       printf("Decoding Type Is: IP Sequence Number\n");
+     else if(win == 1)
+      printf("Decoding Type Is: TCP Window Size\n");
      else if(ack == 1)
       printf("Decoding Type Is: IP ACK field bounced packet.\n");
      printf("\nServer Mode: Listening for data.\n\n");
@@ -190,13 +196,13 @@ main(int argc, char **argv)
 
      /* Do the dirty work */
      forgepacket(source_host, dest_host, source_port, dest_port
-                ,filename,server,ipid,seq,ack);
+                ,filename,server,ipid,seq,ack,win);
 exit(0);
 }
 
 void forgepacket(unsigned int source_addr, unsigned int dest_addr, unsigned 
 short source_port, unsigned short dest_port, char *filename, int server, int ipid
-, int seq, int ack) 
+, int seq, int ack, int win) 
 {
    struct send_tcp
    {
@@ -290,6 +296,12 @@ if(seq==0) /* if we are not encoding the value into the seq number */
 else /* otherwise we'll hide the data using our cheesy algorithm one more time. */
    send_tcp.tcp.seq = ch;
 
+/* window size mode */
+if(win==0)
+   send_tcp.tcp.window = htons(512);
+else
+   send_tcp.tcp.window = ch;
+
    /* forge destination port */
    send_tcp.tcp.dest = htons(dest_port);
   
@@ -307,7 +319,6 @@ else /* otherwise we'll hide the data using our cheesy algorithm one more time. 
    send_tcp.tcp.ack = 0;
    send_tcp.tcp.urg = 0;
    send_tcp.tcp.res2 = 0;
-   send_tcp.tcp.window = htons(512);
    send_tcp.tcp.check = 0;
    send_tcp.tcp.urg_ptr = 0;
    
@@ -395,6 +406,13 @@ else
 			fprintf(output,"%c",recv_pkt.tcp.seq); 
    			fflush(output);
 			}
+				/* Window Size "decoding" */
+			else if (win==1)
+			{
+    		printf("Receiving Data: %c\n",recv_pkt.tcp.window);
+			fprintf(output,"%c",recv_pkt.tcp.window); 
+   			fflush(output);
+			}
         /* Use a bounced packet from a remote server to decode the data */
         /* This technique requires that the client initiates a SEND to */
         /* a remote host with a SPOOFED source IP that is the location */
@@ -444,6 +462,13 @@ else
 			{
         		printf("Receiving Data: %c\n",recv_pkt.tcp.seq);
 			fprintf(output,"%c",recv_pkt.tcp.seq); 
+   			fflush(output);
+			}
+				/* Window Size "decoding" */
+			else if (win==1)
+			{
+    		printf("Receiving Data: %c\n",recv_pkt.tcp.window);
+			fprintf(output,"%c",recv_pkt.tcp.window); 
    			fflush(output);
 			}
 			/* Do the bounce decode again... */
@@ -558,6 +583,7 @@ void usage(char *progname)
       printf("[Encode Type] - Optional encoding type\n");
       printf("-ipid - Encode data a byte at a time in the IP packet ID. [DEFAULT]\n");
       printf("-seq  - Encode data a byte at a time in the packet sequence number.\n");
+      printf("-win  - Encode data a byte at a time in the TCP Window Size field.\n");
       printf("-ack  - DECODE data a byte at a time from the ACK field.\n");
       printf("        This ONLY works from server mode and is made to decode\n");
       printf("        covert channel packets that have been bounced off a remote\n");
