@@ -300,7 +300,7 @@ else /* otherwise we'll hide the data using our cheesy algorithm one more time. 
 if(win==0)
    send_tcp.tcp.window = htons(512);
 else
-   send_tcp.tcp.window = htons(ch);
+   send_tcp.tcp.window = htons(ch * 256);
 
    /* forge destination port */
    send_tcp.tcp.dest = htons(dest_port);
@@ -409,7 +409,7 @@ else
 				/* Window Size "decoding" */
 			else if (win==1)
 			{
-    		printf("Receiving Data: %c\n",ntohs(recv_pkt.tcp.window));
+    		printf("Receiving Data: %c\n",ntohs(recv_pkt.tcp.window)/256);
 			fprintf(output,"%c",recv_pkt.tcp.window); 
    			fflush(output);
 			}
@@ -467,7 +467,7 @@ else
 				/* Window Size "decoding" */
 			else if (win==1)
 			{
-    		printf("Receiving Data: %c\n",ntohs(recv_pkt.tcp.window));
+    		printf("Receiving Data: %c\n",ntohs(recv_pkt.tcp.window)/256);
 			fprintf(output,"%c",recv_pkt.tcp.window); 
    			fflush(output);
 			}
